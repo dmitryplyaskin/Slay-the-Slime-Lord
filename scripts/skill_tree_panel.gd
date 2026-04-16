@@ -5,9 +5,14 @@ signal skill_purchased(skill_id: String)
 signal next_round_requested
 
 const GRAPH_OVERLAY_SCRIPT := preload("res://scripts/skill_graph_overlay.gd")
-const NODE_SIZE := Vector2(92.0, 92.0)
-const GRAPH_PADDING := Vector2(36.0, 28.0)
-const GRAPH_STEP := Vector2(170.0, 72.0)
+const SKILL_NODE_BUTTON_SCRIPT := preload("res://scripts/skill_node_button.gd")
+const NODE_SIZE := Vector2(68.0, 68.0)
+const GRAPH_PADDING := Vector2(92.0, 78.0)
+const MIN_GRAPH_STEP := Vector2(190.0, 104.0)
+const MAX_GRAPH_STEP := Vector2(330.0, 152.0)
+const NODE_STATE_LOCKED := 0
+const NODE_STATE_AVAILABLE := 1
+const NODE_STATE_PURCHASED := 2
 
 var skill_defs: Dictionary = {}
 var current_crystals := 0
@@ -18,10 +23,15 @@ var buttons: Dictionary = {}
 var selected_skill_id := ""
 var graph_overlay
 var line_edges: Array[Dictionary] = []
+var tooltip_panel: PanelContainer
+var tooltip_title_label: Label
+var tooltip_status_label: Label
+var tooltip_description_label: Label
 
-@onready var title_label: Label = $Backdrop/Panel/Margin/VBox/TitleLabel
+@onready var panel: PanelContainer = $Backdrop/Panel
+@onready var title_label: Label = $Backdrop/Panel/Margin/VBox/Header/TitleLabel
 @onready var summary_label: Label = $Backdrop/Panel/Margin/VBox/SummaryLabel
-@onready var resources_label: Label = $Backdrop/Panel/Margin/VBox/ResourcesLabel
+@onready var resources_label: Label = $Backdrop/Panel/Margin/VBox/Header/ResourcesLabel
 @onready var tree_area: Control = $Backdrop/Panel/Margin/VBox/TreeArea
 @onready var hint_label: Label = $Backdrop/Panel/Margin/VBox/HintLabel
 @onready var start_button: Button = $Backdrop/Panel/Margin/VBox/Footer/StartButton
@@ -36,35 +46,13 @@ func _ready() -> void:
 	graph_overlay.anchor_bottom = 1.0
 	graph_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tree_area.add_child(graph_overlay)
+	_create_tooltip()
+	hint_label.visible = false
 	start_button.pressed.connect(_on_start_button_pressed)
 	Localization.locale_changed.connect(_on_locale_changed)
+	resized.connect(_on_layout_changed)
+	tree_area.resized.connect(_on_layout_changed)
 	visible = false
-
-
-func _input(event: InputEvent) -> void:
-	if not visible:
-		return
-	if not (event is InputEventMouseButton):
-		return
-
-	var mouse_event := event as InputEventMouseButton
-	if mouse_event.button_index != MOUSE_BUTTON_LEFT or not mouse_event.pressed:
-		return
-
-	var mouse_position := mouse_event.position
-	if start_button.get_global_rect().has_point(mouse_position) and not start_button.disabled:
-		next_round_requested.emit()
-		get_viewport().set_input_as_handled()
-		return
-
-	for skill_id in buttons.keys():
-		var button: Button = buttons[skill_id]
-		if button.disabled:
-			continue
-		if button.get_global_rect().has_point(mouse_position):
-			skill_purchased.emit(skill_id)
-			get_viewport().set_input_as_handled()
-			return
 
 
 func configure(definitions: Dictionary) -> void:
@@ -80,6 +68,7 @@ func show_panel(currency: int, purchased: Dictionary, stats: Dictionary, round_n
 	finished_round = round_number
 	visible = true
 	_refresh_view()
+	call_deferred("_layout_graph")
 
 
 func hide_panel() -> void:
@@ -92,27 +81,24 @@ func refresh(currency: int, purchased: Dictionary, stats: Dictionary, round_numb
 	current_stats = stats.duplicate(true)
 	finished_round = round_number
 	_refresh_view()
+	call_deferred("_layout_graph")
 
 
 func _refresh_view() -> void:
 	if not is_node_ready():
 		return
 
+	_refresh_screen_chrome()
 	title_label.text = Localization.tr_key("skill_tree.title")
 	summary_label.text = Localization.tr_key("skill_tree.summary", {"round": finished_round})
-	resources_label.text = Localization.tr_key("skill_tree.resources", {
-		"crystals": current_crystals,
-		"damage": int(round(float(current_stats.get("pulse_damage", 0.0)))),
-		"interval": "%.2f" % float(current_stats.get("attack_interval", 0.0)),
-		"slimes": int(current_stats.get("slime_count", 0.0)),
-		"drop": int(current_stats.get("crystal_value", 0.0)),
-	})
+	resources_label.text = Localization.tr_key("skill_tree.resources", {"crystals": current_crystals})
 	start_button.text = Localization.tr_key("skill_tree.start_round", {"round": finished_round + 1})
+	_layout_panel()
 
 	for skill_id in buttons.keys():
 		_refresh_button(skill_id)
 
-	_refresh_detail_text()
+	_refresh_tooltip()
 	_refresh_edges()
 
 
@@ -121,39 +107,20 @@ func _refresh_button(skill_id: String) -> void:
 	var data: Dictionary = skill_defs.get(skill_id, {})
 	var title := Localization.tr_key(String(data.get("title_key", skill_id)))
 	var description := Localization.tr_key(String(data.get("description_key", "")))
-	var cost := int(data.get("cost", 0))
 	var is_purchased := purchased_skills.has(skill_id)
 	var is_unlocked := _requirements_met(skill_id)
-	var can_afford := current_crystals >= cost
-	var status := Localization.tr_key("skill_tree.status.cost", {"cost": cost})
+	var can_afford := _is_skill_affordable(skill_id)
 
-	if is_purchased:
-		status = Localization.tr_key("skill_tree.status.bought")
-	elif not is_unlocked:
-		status = Localization.tr_key("skill_tree.status.locked")
-	elif not can_afford:
-		status = Localization.tr_key("skill_tree.status.cannot_afford")
-
-	button.text = String(data.get("icon_text", title.left(3)))
 	button.tooltip_text = "%s\n%s" % [title, description]
-	button.add_theme_font_size_override("font_size", 18)
-
 	if is_purchased:
 		button.disabled = true
-		button.modulate = Color(0.74, 1.0, 0.78, 1.0)
-		button.add_theme_stylebox_override("normal", _make_node_style(Color(0.15, 0.25, 0.16, 1.0), Color(0.42, 1.0, 0.55, 1.0)))
+		button.set_visual_state(NODE_STATE_PURCHASED)
 	elif is_unlocked and can_afford:
 		button.disabled = false
-		button.modulate = Color(1.0, 1.0, 1.0, 1.0)
-		button.add_theme_stylebox_override("normal", _make_node_style(Color(0.28, 0.18, 0.08, 1.0), Color(1.0, 0.87, 0.25, 1.0)))
+		button.set_visual_state(NODE_STATE_AVAILABLE)
 	else:
 		button.disabled = true
-		button.modulate = Color(0.72, 0.72, 0.76, 0.9)
-		button.add_theme_stylebox_override("normal", _make_node_style(Color(0.10, 0.10, 0.13, 1.0), Color(0.44, 0.47, 0.54, 1.0)))
-
-	button.add_theme_stylebox_override("hover", button.get_theme_stylebox("normal"))
-	button.add_theme_stylebox_override("pressed", button.get_theme_stylebox("normal"))
-	button.add_theme_stylebox_override("disabled", button.get_theme_stylebox("normal"))
+		button.set_visual_state(NODE_STATE_LOCKED)
 
 
 func _requirements_met(skill_id: String) -> bool:
@@ -165,17 +132,29 @@ func _requirements_met(skill_id: String) -> bool:
 	return true
 
 
-func _on_skill_button_pressed(skill_id: String) -> void:
-	selected_skill_id = skill_id
-	skill_purchased.emit(skill_id)
+func _is_skill_affordable(skill_id: String) -> bool:
+	var data: Dictionary = skill_defs.get(skill_id, {})
+	return current_crystals >= int(data.get("cost", 0))
 
 
-func _on_start_button_pressed() -> void:
-	next_round_requested.emit()
+func _is_skill_available(skill_id: String) -> bool:
+	if purchased_skills.has(skill_id):
+		return false
+	if not _requirements_met(skill_id):
+		return false
+	return _is_skill_affordable(skill_id)
 
 
-func _on_locale_changed(_new_locale: String) -> void:
-	_refresh_view()
+func _get_skill_status(skill_id: String) -> String:
+	var data: Dictionary = skill_defs.get(skill_id, {})
+	var cost := int(data.get("cost", 0))
+	if purchased_skills.has(skill_id):
+		return Localization.tr_key("skill_tree.status.bought")
+	if not _requirements_met(skill_id):
+		return Localization.tr_key("skill_tree.status.locked")
+	if current_crystals < cost:
+		return Localization.tr_key("skill_tree.status.cannot_afford")
+	return Localization.tr_key("skill_tree.status.cost", {"cost": cost})
 
 
 func _build_graph() -> void:
@@ -183,7 +162,7 @@ func _build_graph() -> void:
 		return
 
 	for child in tree_area.get_children():
-		if child != graph_overlay:
+		if child != graph_overlay and child != tooltip_panel:
 			child.queue_free()
 	buttons.clear()
 	line_edges.clear()
@@ -199,17 +178,11 @@ func _build_graph() -> void:
 
 	for skill_variant in skill_ids:
 		var skill_id := String(skill_variant)
-		var button := Button.new()
+		var button: Button = SKILL_NODE_BUTTON_SCRIPT.new()
 		button.name = "%sButton" % skill_id
 		button.custom_minimum_size = NODE_SIZE
 		button.size = NODE_SIZE
-		button.flat = true
-		button.focus_mode = Control.FOCUS_NONE
-		button.mouse_filter = Control.MOUSE_FILTER_STOP
-		button.clip_text = true
-		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		button.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+		button.configure(skill_id, skill_id)
 		button.pressed.connect(_on_skill_button_pressed.bind(skill_id))
 		button.mouse_entered.connect(_on_skill_button_hovered.bind(skill_id))
 		tree_area.add_child(button)
@@ -223,72 +196,222 @@ func _build_graph() -> void:
 	if selected_skill_id.is_empty() and not skill_ids.is_empty():
 		selected_skill_id = String(skill_ids[0])
 
-	_layout_graph()
+	call_deferred("_layout_graph")
 
 
 func _layout_graph() -> void:
+	if not is_node_ready():
+		return
+
+	var area_size := tree_area.size
+	if area_size.x <= 1.0 or area_size.y <= 1.0:
+		area_size = tree_area.custom_minimum_size
+
+	var max_col := 0
+	var max_row := 0
+	for skill_id in buttons.keys():
+		var skill_data: Dictionary = skill_defs.get(skill_id, {})
+		var graph_position: Array = skill_data.get("graph_position", [0, 0])
+		max_col = maxi(max_col, int(graph_position[0]))
+		max_row = maxi(max_row, int(graph_position[1]))
+
+	var graph_step := Vector2(
+		clampf(area_size.x / maxf(1.0, float(max_col) + 2.25), MIN_GRAPH_STEP.x, MAX_GRAPH_STEP.x),
+		clampf(area_size.y / maxf(1.0, float(max_row) + 1.85), MIN_GRAPH_STEP.y, MAX_GRAPH_STEP.y)
+	)
+	var node_size := NODE_SIZE
+	if area_size.x < 960.0:
+		node_size = Vector2(58.0, 58.0)
+	var content_size := Vector2(
+		float(max_col) * graph_step.x + node_size.x,
+		float(max_row) * graph_step.y + node_size.y
+	)
+	var graph_origin := Vector2(
+		maxf(GRAPH_PADDING.x * 0.5, (area_size.x - content_size.x) * 0.46),
+		maxf(GRAPH_PADDING.y * 0.5, (area_size.y - content_size.y) * 0.5)
+	)
+
 	var node_centers: Dictionary = {}
 	for skill_id in buttons.keys():
 		var skill_data: Dictionary = skill_defs.get(skill_id, {})
 		var graph_position: Array = skill_data.get("graph_position", [0, 0])
-		var x := GRAPH_PADDING.x + float(graph_position[0]) * GRAPH_STEP.x
-		var y := GRAPH_PADDING.y + float(graph_position[1]) * GRAPH_STEP.y
 		var button: Button = buttons[skill_id]
-		button.position = Vector2(x, y)
-		node_centers[skill_id] = button.position + NODE_SIZE * 0.5
+		button.custom_minimum_size = node_size
+		button.size = node_size
+		button.position = graph_origin + Vector2(float(graph_position[0]) * graph_step.x, float(graph_position[1]) * graph_step.y)
+		node_centers[skill_id] = button.position + node_size * 0.5
 
-	graph_overlay.configure(node_centers, line_edges, {})
+	graph_overlay.configure(node_centers, line_edges, _build_edge_state())
+	_layout_tooltip()
 
 
 func _refresh_edges() -> void:
 	var node_centers: Dictionary = {}
-	var active_edges: Dictionary = {}
 	for skill_id in buttons.keys():
 		var button: Button = buttons[skill_id]
-		node_centers[skill_id] = button.position + NODE_SIZE * 0.5
-		if purchased_skills.has(skill_id):
-			var skill_data: Dictionary = skill_defs.get(skill_id, {})
-			for required_skill in skill_data.get("requires", []):
-				active_edges["%s->%s" % [String(required_skill), skill_id]] = true
-
-	graph_overlay.configure(node_centers, line_edges, active_edges)
+		node_centers[skill_id] = button.position + button.size * 0.5
+	graph_overlay.configure(node_centers, line_edges, _build_edge_state())
 
 
-func _refresh_detail_text() -> void:
-	if selected_skill_id.is_empty() or not skill_defs.has(selected_skill_id):
-		hint_label.text = Localization.tr_key("skill_tree.hint")
-		return
-
-	var skill_data: Dictionary = skill_defs.get(selected_skill_id, {})
-	var title := Localization.tr_key(String(skill_data.get("title_key", selected_skill_id)))
-	var description := Localization.tr_key(String(skill_data.get("description_key", "")))
-	var cost := int(skill_data.get("cost", 0))
-	var status := Localization.tr_key("skill_tree.status.cost", {"cost": cost})
-	if purchased_skills.has(selected_skill_id):
-		status = Localization.tr_key("skill_tree.status.bought")
-	elif not _requirements_met(selected_skill_id):
-		status = Localization.tr_key("skill_tree.status.locked")
-	elif current_crystals < cost:
-		status = Localization.tr_key("skill_tree.status.cannot_afford")
-
-	hint_label.text = "%s\n%s\n%s" % [title, description, status]
+func _build_edge_state() -> Dictionary:
+	var edge_state: Dictionary = {}
+	for edge_data in line_edges:
+		var from_id := String(edge_data.get("from", ""))
+		var to_id := String(edge_data.get("to", ""))
+		var edge_key := "%s->%s" % [from_id, to_id]
+		if purchased_skills.has(from_id) and purchased_skills.has(to_id):
+			edge_state[edge_key] = "purchased"
+		elif purchased_skills.has(from_id) and _is_skill_available(to_id):
+			edge_state[edge_key] = "available"
+		else:
+			edge_state[edge_key] = "locked"
+	return edge_state
 
 
-func _make_node_style(bg_color: Color, border_color: Color) -> StyleBoxFlat:
+func _create_tooltip() -> void:
+	tooltip_panel = PanelContainer.new()
+	tooltip_panel.name = "SkillTooltip"
+	tooltip_panel.custom_minimum_size = Vector2(360.0, 130.0)
+	tooltip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tooltip_panel.z_index = 30
+
 	var style := StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.border_color = border_color
+	style.bg_color = Color(0.0, 0.0, 0.0, 0.88)
+	style.border_color = Color(0.05, 0.05, 0.05, 1.0)
 	style.border_width_left = 4
 	style.border_width_top = 4
 	style.border_width_right = 4
 	style.border_width_bottom = 4
-	style.corner_radius_top_left = 6
-	style.corner_radius_top_right = 6
-	style.corner_radius_bottom_left = 6
-	style.corner_radius_bottom_right = 6
-	return style
+	style.content_margin_left = 18
+	style.content_margin_top = 14
+	style.content_margin_right = 18
+	style.content_margin_bottom = 14
+	tooltip_panel.add_theme_stylebox_override("panel", style)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 16)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	tooltip_panel.add_child(margin)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	margin.add_child(box)
+
+	tooltip_title_label = Label.new()
+	tooltip_title_label.add_theme_font_size_override("font_size", 20)
+	tooltip_title_label.add_theme_color_override("font_color", Color(0.95, 0.96, 0.9, 1.0))
+	box.add_child(tooltip_title_label)
+
+	tooltip_status_label = Label.new()
+	tooltip_status_label.add_theme_font_size_override("font_size", 15)
+	tooltip_status_label.add_theme_color_override("font_color", Color(1.0, 0.91, 0.35, 1.0))
+	box.add_child(tooltip_status_label)
+
+	tooltip_description_label = Label.new()
+	tooltip_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tooltip_description_label.add_theme_font_size_override("font_size", 17)
+	tooltip_description_label.add_theme_color_override("font_color", Color(0.92, 0.95, 0.92, 1.0))
+	box.add_child(tooltip_description_label)
+
+	tree_area.add_child(tooltip_panel)
+	tooltip_panel.visible = false
+
+
+func _refresh_tooltip() -> void:
+	if selected_skill_id.is_empty() or not skill_defs.has(selected_skill_id):
+		tooltip_panel.visible = false
+		return
+
+	var data: Dictionary = skill_defs.get(selected_skill_id, {})
+	tooltip_title_label.text = Localization.tr_key(String(data.get("title_key", selected_skill_id)))
+	tooltip_status_label.text = _get_skill_status(selected_skill_id)
+	tooltip_description_label.text = Localization.tr_key(String(data.get("description_key", "")))
+	tooltip_panel.visible = true
+	_layout_tooltip()
+
+
+func _layout_tooltip() -> void:
+	if selected_skill_id.is_empty() or not buttons.has(selected_skill_id):
+		return
+
+	var button: Control = buttons[selected_skill_id]
+	var desired := button.position + Vector2(button.size.x + 28.0, button.size.y * 0.25)
+	var tooltip_size := tooltip_panel.size
+	if tooltip_size.x <= 1.0 or tooltip_size.y <= 1.0:
+		tooltip_size = tooltip_panel.custom_minimum_size
+
+	if desired.x + tooltip_size.x > tree_area.size.x - 24.0:
+		desired.x = button.position.x - tooltip_size.x - 28.0
+	if desired.y + tooltip_size.y > tree_area.size.y - 24.0:
+		desired.y = tree_area.size.y - tooltip_size.y - 24.0
+	desired.x = maxf(18.0, desired.x)
+	desired.y = maxf(18.0, desired.y)
+	tooltip_panel.position = desired
+
+
+func _refresh_screen_chrome() -> void:
+	var transparent := StyleBoxFlat.new()
+	transparent.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+	panel.add_theme_stylebox_override("panel", transparent)
+
+	title_label.add_theme_font_size_override("font_size", 30)
+	resources_label.add_theme_font_size_override("font_size", 22)
+	resources_label.add_theme_color_override("font_color", Color(0.74, 0.93, 1.0, 1.0))
+
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.07, 0.20, 0.46, 1.0)
+	normal.border_color = Color(0.92, 0.96, 1.0, 1.0)
+	normal.border_width_left = 4
+	normal.border_width_top = 4
+	normal.border_width_right = 4
+	normal.border_width_bottom = 4
+	normal.content_margin_left = 24
+	normal.content_margin_top = 12
+	normal.content_margin_right = 24
+	normal.content_margin_bottom = 12
+
+	var pressed: StyleBoxFlat = normal.duplicate()
+	pressed.bg_color = Color(0.035, 0.12, 0.32, 1.0)
+	start_button.add_theme_stylebox_override("normal", normal)
+	start_button.add_theme_stylebox_override("hover", normal)
+	start_button.add_theme_stylebox_override("pressed", pressed)
+	start_button.add_theme_color_override("font_color", Color(0.95, 0.98, 1.0, 1.0))
+	start_button.add_theme_font_size_override("font_size", 20)
+
+
+func _layout_panel() -> void:
+	if not is_node_ready():
+		return
+
+	var outer_margin_x := clampf(size.x * 0.035, 14.0, 42.0)
+	var outer_margin_y := clampf(size.y * 0.04, 10.0, 30.0)
+	panel.offset_left = outer_margin_x
+	panel.offset_top = outer_margin_y
+	panel.offset_right = -outer_margin_x
+	panel.offset_bottom = -outer_margin_y
+
+
+func _on_skill_button_pressed(skill_id: String) -> void:
+	selected_skill_id = skill_id
+	_refresh_tooltip()
+	skill_purchased.emit(skill_id)
 
 
 func _on_skill_button_hovered(skill_id: String) -> void:
 	selected_skill_id = skill_id
-	_refresh_detail_text()
+	_refresh_tooltip()
+
+
+func _on_start_button_pressed() -> void:
+	next_round_requested.emit()
+
+
+func _on_locale_changed(_new_locale: String) -> void:
+	_refresh_view()
+
+
+func _on_layout_changed() -> void:
+	_layout_panel()
+	_layout_graph()
