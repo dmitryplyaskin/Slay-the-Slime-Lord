@@ -13,6 +13,10 @@ const MAX_GRAPH_STEP := Vector2(330.0, 152.0)
 const NODE_STATE_LOCKED := 0
 const NODE_STATE_AVAILABLE := 1
 const NODE_STATE_PURCHASED := 2
+const MIN_GRAPH_ZOOM := 0.65
+const MAX_GRAPH_ZOOM := 1.55
+const GRAPH_ZOOM_STEP := 1.12
+const GRAPH_PAN_MARGIN := 120.0
 
 var skill_defs: Dictionary = {}
 var current_crystals := 0
@@ -21,12 +25,17 @@ var current_stats: Dictionary = {}
 var finished_round := 1
 var buttons: Dictionary = {}
 var selected_skill_id := ""
+var graph_content: Control
 var graph_overlay
 var line_edges: Array[Dictionary] = []
 var tooltip_panel: PanelContainer
 var tooltip_title_label: Label
 var tooltip_status_label: Label
 var tooltip_description_label: Label
+var graph_zoom := 1.0
+var graph_offset := Vector2.ZERO
+var is_panning_graph := false
+var last_pan_position := Vector2.ZERO
 
 @onready var panel: PanelContainer = $Backdrop/Panel
 @onready var title_label: Label = $Backdrop/Panel/Margin/VBox/Header/TitleLabel
@@ -38,6 +47,16 @@ var tooltip_description_label: Label
 
 
 func _ready() -> void:
+	tree_area.clip_contents = true
+	graph_content = Control.new()
+	graph_content.name = "GraphContent"
+	graph_content.layout_mode = 1
+	graph_content.anchors_preset = PRESET_FULL_RECT
+	graph_content.anchor_right = 1.0
+	graph_content.anchor_bottom = 1.0
+	graph_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tree_area.add_child(graph_content)
+
 	graph_overlay = GRAPH_OVERLAY_SCRIPT.new()
 	graph_overlay.name = "GraphOverlay"
 	graph_overlay.layout_mode = 1
@@ -45,11 +64,13 @@ func _ready() -> void:
 	graph_overlay.anchor_right = 1.0
 	graph_overlay.anchor_bottom = 1.0
 	graph_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tree_area.add_child(graph_overlay)
+	graph_content.add_child(graph_overlay)
 	_create_tooltip()
 	hint_label.visible = false
 	start_button.pressed.connect(_on_start_button_pressed)
 	Localization.locale_changed.connect(_on_locale_changed)
+	tree_area.gui_input.connect(_on_tree_area_gui_input)
+	tree_area.mouse_exited.connect(_on_tree_area_mouse_exited)
 	resized.connect(_on_layout_changed)
 	tree_area.resized.connect(_on_layout_changed)
 	visible = false
@@ -66,6 +87,7 @@ func show_panel(currency: int, purchased: Dictionary, stats: Dictionary, round_n
 	purchased_skills = purchased.duplicate(true)
 	current_stats = stats.duplicate(true)
 	finished_round = round_number
+	_reset_graph_view()
 	visible = true
 	_refresh_view()
 	call_deferred("_layout_graph")
@@ -111,15 +133,13 @@ func _refresh_button(skill_id: String) -> void:
 	var is_unlocked := _requirements_met(skill_id)
 	var can_afford := _is_skill_affordable(skill_id)
 
-	button.tooltip_text = "%s\n%s" % [title, description]
+	button.tooltip_text = ""
+	button.disabled = false
 	if is_purchased:
-		button.disabled = true
 		button.set_visual_state(NODE_STATE_PURCHASED)
 	elif is_unlocked and can_afford:
-		button.disabled = false
 		button.set_visual_state(NODE_STATE_AVAILABLE)
 	else:
-		button.disabled = true
 		button.set_visual_state(NODE_STATE_LOCKED)
 
 
@@ -161,11 +181,12 @@ func _build_graph() -> void:
 	if not is_node_ready():
 		return
 
-	for child in tree_area.get_children():
+	for child in graph_content.get_children():
 		if child != graph_overlay and child != tooltip_panel:
 			child.queue_free()
 	buttons.clear()
 	line_edges.clear()
+	selected_skill_id = ""
 
 	var skill_ids := skill_defs.keys()
 	skill_ids.sort_custom(func(a: Variant, b: Variant) -> bool:
@@ -183,18 +204,17 @@ func _build_graph() -> void:
 		button.custom_minimum_size = NODE_SIZE
 		button.size = NODE_SIZE
 		button.configure(skill_id, skill_id)
+		button.mouse_filter = Control.MOUSE_FILTER_PASS
 		button.pressed.connect(_on_skill_button_pressed.bind(skill_id))
 		button.mouse_entered.connect(_on_skill_button_hovered.bind(skill_id))
-		tree_area.add_child(button)
-		tree_area.move_child(button, tree_area.get_child_count() - 1)
+		button.mouse_exited.connect(_on_skill_button_unhovered.bind(skill_id))
+		graph_content.add_child(button)
+		graph_content.move_child(button, graph_content.get_child_count() - 1)
 		buttons[skill_id] = button
 
 		var skill_data: Dictionary = skill_defs.get(skill_id, {})
 		for required_skill in skill_data.get("requires", []):
 			line_edges.append({"from": String(required_skill), "to": skill_id})
-
-	if selected_skill_id.is_empty() and not skill_ids.is_empty():
-		selected_skill_id = String(skill_ids[0])
 
 	call_deferred("_layout_graph")
 
@@ -206,6 +226,8 @@ func _layout_graph() -> void:
 	var area_size := tree_area.size
 	if area_size.x <= 1.0 or area_size.y <= 1.0:
 		area_size = tree_area.custom_minimum_size
+	graph_content.size = area_size
+	graph_overlay.size = area_size
 
 	var max_col := 0
 	var max_row := 0
@@ -242,6 +264,7 @@ func _layout_graph() -> void:
 		node_centers[skill_id] = button.position + node_size * 0.5
 
 	graph_overlay.configure(node_centers, line_edges, _build_edge_state())
+	_apply_graph_transform()
 	_layout_tooltip()
 
 
@@ -271,7 +294,7 @@ func _build_edge_state() -> Dictionary:
 func _create_tooltip() -> void:
 	tooltip_panel = PanelContainer.new()
 	tooltip_panel.name = "SkillTooltip"
-	tooltip_panel.custom_minimum_size = Vector2(360.0, 130.0)
+	tooltip_panel.custom_minimum_size = Vector2.ZERO
 	tooltip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tooltip_panel.z_index = 30
 
@@ -282,17 +305,17 @@ func _create_tooltip() -> void:
 	style.border_width_top = 4
 	style.border_width_right = 4
 	style.border_width_bottom = 4
-	style.content_margin_left = 18
-	style.content_margin_top = 14
-	style.content_margin_right = 18
-	style.content_margin_bottom = 14
+	style.content_margin_left = 12
+	style.content_margin_top = 10
+	style.content_margin_right = 12
+	style.content_margin_bottom = 10
 	tooltip_panel.add_theme_stylebox_override("panel", style)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 16)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_right", 16)
-	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 8)
 	tooltip_panel.add_child(margin)
 
 	var box := VBoxContainer.new()
@@ -328,8 +351,17 @@ func _refresh_tooltip() -> void:
 	tooltip_title_label.text = Localization.tr_key(String(data.get("title_key", selected_skill_id)))
 	tooltip_status_label.text = _get_skill_status(selected_skill_id)
 	tooltip_description_label.text = Localization.tr_key(String(data.get("description_key", "")))
+	_resize_tooltip_to_content()
 	tooltip_panel.visible = true
 	_layout_tooltip()
+
+
+func _resize_tooltip_to_content() -> void:
+	if tooltip_panel == null:
+		return
+
+	tooltip_panel.size = Vector2.ZERO
+	tooltip_panel.reset_size()
 
 
 func _layout_tooltip() -> void:
@@ -337,13 +369,16 @@ func _layout_tooltip() -> void:
 		return
 
 	var button: Control = buttons[selected_skill_id]
-	var desired := button.position + Vector2(button.size.x + 28.0, button.size.y * 0.25)
-	var tooltip_size := tooltip_panel.size
+	var button_position := graph_content.position + button.position * graph_zoom
+	var button_size := button.size * graph_zoom
+	var desired := button_position + Vector2(button_size.x + 28.0, button_size.y * 0.25)
+	var tooltip_size := tooltip_panel.get_combined_minimum_size()
 	if tooltip_size.x <= 1.0 or tooltip_size.y <= 1.0:
-		tooltip_size = tooltip_panel.custom_minimum_size
+		tooltip_size = tooltip_panel.size
+	tooltip_panel.size = tooltip_size
 
 	if desired.x + tooltip_size.x > tree_area.size.x - 24.0:
-		desired.x = button.position.x - tooltip_size.x - 28.0
+		desired.x = button_position.x - tooltip_size.x - 28.0
 	if desired.y + tooltip_size.y > tree_area.size.y - 24.0:
 		desired.y = tree_area.size.y - tooltip_size.y - 24.0
 	desired.x = maxf(18.0, desired.x)
@@ -396,12 +431,110 @@ func _layout_panel() -> void:
 func _on_skill_button_pressed(skill_id: String) -> void:
 	selected_skill_id = skill_id
 	_refresh_tooltip()
+	if not _is_skill_available(skill_id):
+		return
 	skill_purchased.emit(skill_id)
 
 
 func _on_skill_button_hovered(skill_id: String) -> void:
 	selected_skill_id = skill_id
 	_refresh_tooltip()
+
+
+func _on_skill_button_unhovered(skill_id: String) -> void:
+	if selected_skill_id != skill_id:
+		return
+
+	selected_skill_id = ""
+	_refresh_tooltip()
+
+
+func _on_tree_area_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if mouse_event.button_index == MOUSE_BUTTON_WHEEL_UP and mouse_event.pressed:
+			_zoom_graph_at(tree_area.get_local_mouse_position(), GRAPH_ZOOM_STEP)
+			accept_event()
+		elif mouse_event.button_index == MOUSE_BUTTON_WHEEL_DOWN and mouse_event.pressed:
+			_zoom_graph_at(tree_area.get_local_mouse_position(), 1.0 / GRAPH_ZOOM_STEP)
+			accept_event()
+		elif _is_graph_pan_button(mouse_event.button_index):
+			is_panning_graph = mouse_event.pressed
+			last_pan_position = tree_area.get_local_mouse_position()
+			if is_panning_graph:
+				accept_event()
+		elif mouse_event.button_index == MOUSE_BUTTON_LEFT:
+			is_panning_graph = mouse_event.pressed and not _is_mouse_over_skill_node()
+			last_pan_position = tree_area.get_local_mouse_position()
+			if is_panning_graph:
+				accept_event()
+	elif event is InputEventMouseMotion and is_panning_graph:
+		var current_position := tree_area.get_local_mouse_position()
+		graph_offset += current_position - last_pan_position
+		last_pan_position = current_position
+		_apply_graph_transform()
+		accept_event()
+
+
+func _on_tree_area_mouse_exited() -> void:
+	is_panning_graph = false
+	selected_skill_id = ""
+	_refresh_tooltip()
+
+
+func _is_graph_pan_button(button_index: int) -> bool:
+	return button_index == MOUSE_BUTTON_MIDDLE or button_index == MOUSE_BUTTON_RIGHT
+
+
+func _is_mouse_over_skill_node() -> bool:
+	var mouse_position := tree_area.get_local_mouse_position()
+	for skill_id in buttons.keys():
+		var button: Control = buttons[skill_id]
+		var button_rect := Rect2(
+			graph_content.position + button.position * graph_zoom,
+			button.size * graph_zoom
+		)
+		if button_rect.has_point(mouse_position):
+			return true
+	return false
+
+
+func _zoom_graph_at(mouse_position: Vector2, zoom_factor: float) -> void:
+	var previous_zoom := graph_zoom
+	graph_zoom = clampf(graph_zoom * zoom_factor, MIN_GRAPH_ZOOM, MAX_GRAPH_ZOOM)
+	if is_equal_approx(previous_zoom, graph_zoom):
+		return
+
+	graph_offset = mouse_position - (mouse_position - graph_offset) * (graph_zoom / previous_zoom)
+	_apply_graph_transform()
+
+
+func _reset_graph_view() -> void:
+	graph_zoom = 1.0
+	graph_offset = Vector2.ZERO
+	is_panning_graph = false
+	if graph_content != null:
+		_apply_graph_transform()
+
+
+func _apply_graph_transform() -> void:
+	if graph_content == null or not is_node_ready():
+		return
+
+	_clamp_graph_offset()
+	graph_content.position = graph_offset
+	graph_content.scale = Vector2.ONE * graph_zoom
+	_layout_tooltip()
+
+
+func _clamp_graph_offset() -> void:
+	if graph_content == null:
+		return
+
+	var area_size := tree_area.size
+	var content_size := graph_content.size * graph_zoom
+	graph_offset.x = clampf(graph_offset.x, area_size.x - content_size.x - GRAPH_PAN_MARGIN, GRAPH_PAN_MARGIN)
+	graph_offset.y = clampf(graph_offset.y, area_size.y - content_size.y - GRAPH_PAN_MARGIN, GRAPH_PAN_MARGIN)
 
 
 func _on_start_button_pressed() -> void:

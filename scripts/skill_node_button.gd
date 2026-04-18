@@ -15,7 +15,7 @@ var visual_state := VisualState.LOCKED
 func _ready() -> void:
 	flat = true
 	focus_mode = Control.FOCUS_NONE
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_filter = Control.MOUSE_FILTER_PASS
 	text = ""
 	var empty := StyleBoxEmpty.new()
 	add_theme_stylebox_override("normal", empty)
