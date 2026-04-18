@@ -36,6 +36,10 @@ func get_effective_stats() -> Dictionary:
 	var overrides: Dictionary = {}
 
 	for skill_id in purchased_skills.keys():
+		var skill_rank := _get_skill_rank(String(skill_id))
+		if skill_rank <= 0:
+			continue
+
 		var skill_data: Dictionary = skill_defs.get(skill_id, {})
 		for modifier_data in skill_data.get("modifiers", []):
 			var modifier: Dictionary = modifier_data
@@ -44,9 +48,9 @@ func get_effective_stats() -> Dictionary:
 			var value := float(modifier.get("value", 0.0))
 			match mode:
 				STAT_ADD:
-					additive[stat_key] = float(additive.get(stat_key, 0.0)) + value
+					additive[stat_key] = float(additive.get(stat_key, 0.0)) + value * float(skill_rank)
 				STAT_MULTIPLY:
-					multiplicative[stat_key] = float(multiplicative.get(stat_key, 1.0)) * value
+					multiplicative[stat_key] = float(multiplicative.get(stat_key, 1.0)) * pow(value, skill_rank)
 				STAT_OVERRIDE:
 					overrides[stat_key] = value
 
@@ -107,29 +111,59 @@ func earn_crystals(amount: int) -> void:
 
 
 func can_purchase(skill_id: String) -> bool:
-	if purchased_skills.has(skill_id):
-		return false
-
 	var skill_data: Dictionary = skill_defs.get(skill_id, {})
 	if skill_data.is_empty():
 		return false
 
+	if _get_skill_rank(skill_id) >= _get_skill_max_rank(skill_data):
+		return false
+
 	for required_skill in skill_data.get("requires", []):
-		if not purchased_skills.has(String(required_skill)):
+		if _get_skill_rank(String(required_skill)) <= 0:
 			return false
 
-	return crystal_bank >= int(skill_data.get("cost", 0))
+	return crystal_bank >= get_skill_cost(skill_id)
 
 
 func purchase_skill(skill_id: String) -> bool:
 	if not can_purchase(skill_id):
 		return false
 
-	var skill_data: Dictionary = skill_defs.get(skill_id, {})
-	crystal_bank -= int(skill_data.get("cost", 0))
-	purchased_skills[skill_id] = true
+	crystal_bank -= get_skill_cost(skill_id)
+	purchased_skills[skill_id] = _get_skill_rank(skill_id) + 1
 	return true
 
 
 func get_purchased_skills() -> Dictionary:
 	return purchased_skills.duplicate(true)
+
+
+func get_skill_cost(skill_id: String) -> int:
+	var skill_data: Dictionary = skill_defs.get(skill_id, {})
+	if skill_data.is_empty():
+		return 0
+
+	var next_rank := _get_skill_rank(skill_id) + 1
+	var rank_costs: Array = skill_data.get("rank_costs", [])
+	if next_rank > 0 and next_rank <= rank_costs.size():
+		return int(rank_costs[next_rank - 1])
+
+	var base_cost := int(skill_data.get("cost", 0))
+	var cost_per_rank := int(skill_data.get("cost_per_rank", 0))
+	return base_cost + maxi(next_rank - 1, 0) * cost_per_rank
+
+
+func get_skill_rank(skill_id: String) -> int:
+	return _get_skill_rank(skill_id)
+
+
+func get_skill_max_rank(skill_id: String) -> int:
+	return _get_skill_max_rank(skill_defs.get(skill_id, {}))
+
+
+func _get_skill_rank(skill_id: String) -> int:
+	return int(purchased_skills.get(skill_id, 0))
+
+
+func _get_skill_max_rank(skill_data: Dictionary) -> int:
+	return maxi(1, int(skill_data.get("max_rank", 1)))

@@ -120,22 +120,29 @@ func _refresh_view() -> void:
 	for skill_id in buttons.keys():
 		_refresh_button(skill_id)
 
+	if not selected_skill_id.is_empty() and not _is_skill_revealed(selected_skill_id):
+		selected_skill_id = ""
+
 	_refresh_tooltip()
 	_refresh_edges()
 
 
 func _refresh_button(skill_id: String) -> void:
-	var button: Button = buttons[skill_id]
+	var button: SkillNodeButton = buttons[skill_id]
 	var data: Dictionary = skill_defs.get(skill_id, {})
-	var title := Localization.tr_key(String(data.get("title_key", skill_id)))
-	var description := Localization.tr_key(String(data.get("description_key", "")))
-	var is_purchased := purchased_skills.has(skill_id)
+	var is_revealed := _is_skill_revealed(skill_id)
+	var current_rank := _get_skill_rank(skill_id)
+	var max_rank := _get_skill_max_rank(data)
 	var is_unlocked := _requirements_met(skill_id)
 	var can_afford := _is_skill_affordable(skill_id)
 
 	button.tooltip_text = ""
-	button.disabled = false
-	if is_purchased:
+	button.visible = is_revealed
+	button.disabled = not is_revealed
+	button.set_rank_progress(current_rank, max_rank)
+	if not is_revealed:
+		button.set_visual_state(NODE_STATE_LOCKED)
+	elif current_rank >= max_rank:
 		button.set_visual_state(NODE_STATE_PURCHASED)
 	elif is_unlocked and can_afford:
 		button.set_visual_state(NODE_STATE_AVAILABLE)
@@ -147,18 +154,20 @@ func _requirements_met(skill_id: String) -> bool:
 	var data: Dictionary = skill_defs.get(skill_id, {})
 	var requirements: Array = data.get("requires", [])
 	for required_skill in requirements:
-		if not purchased_skills.has(String(required_skill)):
+		if _get_skill_rank(String(required_skill)) <= 0:
 			return false
 	return true
 
 
 func _is_skill_affordable(skill_id: String) -> bool:
-	var data: Dictionary = skill_defs.get(skill_id, {})
-	return current_crystals >= int(data.get("cost", 0))
+	return current_crystals >= _get_skill_cost(skill_id)
 
 
 func _is_skill_available(skill_id: String) -> bool:
-	if purchased_skills.has(skill_id):
+	var data: Dictionary = skill_defs.get(skill_id, {})
+	if not _is_skill_revealed(skill_id):
+		return false
+	if _get_skill_rank(skill_id) >= _get_skill_max_rank(data):
 		return false
 	if not _requirements_met(skill_id):
 		return false
@@ -167,14 +176,54 @@ func _is_skill_available(skill_id: String) -> bool:
 
 func _get_skill_status(skill_id: String) -> String:
 	var data: Dictionary = skill_defs.get(skill_id, {})
-	var cost := int(data.get("cost", 0))
-	if purchased_skills.has(skill_id):
+	var cost := _get_skill_cost(skill_id)
+	var current_rank := _get_skill_rank(skill_id)
+	var max_rank := _get_skill_max_rank(data)
+	if current_rank >= max_rank:
+		if max_rank > 1:
+			return Localization.tr_key("skill_tree.status.max_rank", {"rank": current_rank, "max": max_rank})
 		return Localization.tr_key("skill_tree.status.bought")
 	if not _requirements_met(skill_id):
 		return Localization.tr_key("skill_tree.status.locked")
 	if current_crystals < cost:
+		if max_rank > 1:
+			return Localization.tr_key("skill_tree.status.rank_cannot_afford", {"rank": current_rank, "max": max_rank})
 		return Localization.tr_key("skill_tree.status.cannot_afford")
+	if max_rank > 1:
+		return Localization.tr_key("skill_tree.status.rank_cost", {"rank": current_rank, "max": max_rank, "cost": cost})
 	return Localization.tr_key("skill_tree.status.cost", {"cost": cost})
+
+
+func _is_skill_revealed(skill_id: String) -> bool:
+	var data: Dictionary = skill_defs.get(skill_id, {})
+	var requirements: Array = data.get("requires", [])
+	if requirements.is_empty():
+		return true
+
+	for required_skill in requirements:
+		if _get_skill_rank(String(required_skill)) > 0:
+			return true
+	return false
+
+
+func _get_skill_cost(skill_id: String) -> int:
+	var data: Dictionary = skill_defs.get(skill_id, {})
+	var next_rank := _get_skill_rank(skill_id) + 1
+	var rank_costs: Array = data.get("rank_costs", [])
+	if next_rank > 0 and next_rank <= rank_costs.size():
+		return int(rank_costs[next_rank - 1])
+
+	var base_cost := int(data.get("cost", 0))
+	var cost_per_rank := int(data.get("cost_per_rank", 0))
+	return base_cost + maxi(next_rank - 1, 0) * cost_per_rank
+
+
+func _get_skill_rank(skill_id: String) -> int:
+	return int(purchased_skills.get(skill_id, 0))
+
+
+func _get_skill_max_rank(skill_data: Dictionary) -> int:
+	return maxi(1, int(skill_data.get("max_rank", 1)))
 
 
 func _build_graph() -> void:
@@ -229,29 +278,13 @@ func _layout_graph() -> void:
 	graph_content.size = area_size
 	graph_overlay.size = area_size
 
-	var max_col := 0
-	var max_row := 0
-	for skill_id in buttons.keys():
-		var skill_data: Dictionary = skill_defs.get(skill_id, {})
-		var graph_position: Array = skill_data.get("graph_position", [0, 0])
-		max_col = maxi(max_col, int(graph_position[0]))
-		max_row = maxi(max_row, int(graph_position[1]))
-
-	var graph_step := Vector2(
-		clampf(area_size.x / maxf(1.0, float(max_col) + 2.25), MIN_GRAPH_STEP.x, MAX_GRAPH_STEP.x),
-		clampf(area_size.y / maxf(1.0, float(max_row) + 1.85), MIN_GRAPH_STEP.y, MAX_GRAPH_STEP.y)
-	)
 	var node_size := NODE_SIZE
 	if area_size.x < 960.0:
 		node_size = Vector2(58.0, 58.0)
-	var content_size := Vector2(
-		float(max_col) * graph_step.x + node_size.x,
-		float(max_row) * graph_step.y + node_size.y
-	)
-	var graph_origin := Vector2(
-		maxf(GRAPH_PADDING.x * 0.5, (area_size.x - content_size.x) * 0.46),
-		maxf(GRAPH_PADDING.y * 0.5, (area_size.y - content_size.y) * 0.5)
-	)
+
+	var graph_step_value := clampf(minf(area_size.x / 5.4, area_size.y / 4.8), MIN_GRAPH_STEP.y, MAX_GRAPH_STEP.y)
+	var graph_step := Vector2.ONE * graph_step_value
+	var graph_center := area_size * 0.5
 
 	var node_centers: Dictionary = {}
 	for skill_id in buttons.keys():
@@ -260,8 +293,9 @@ func _layout_graph() -> void:
 		var button: Button = buttons[skill_id]
 		button.custom_minimum_size = node_size
 		button.size = node_size
-		button.position = graph_origin + Vector2(float(graph_position[0]) * graph_step.x, float(graph_position[1]) * graph_step.y)
-		node_centers[skill_id] = button.position + node_size * 0.5
+		button.position = graph_center + Vector2(float(graph_position[0]) * graph_step.x, float(graph_position[1]) * graph_step.y) - node_size * 0.5
+		if button.visible:
+			node_centers[skill_id] = button.position + node_size * 0.5
 
 	graph_overlay.configure(node_centers, line_edges, _build_edge_state())
 	_apply_graph_transform()
@@ -272,7 +306,8 @@ func _refresh_edges() -> void:
 	var node_centers: Dictionary = {}
 	for skill_id in buttons.keys():
 		var button: Button = buttons[skill_id]
-		node_centers[skill_id] = button.position + button.size * 0.5
+		if button.visible:
+			node_centers[skill_id] = button.position + button.size * 0.5
 	graph_overlay.configure(node_centers, line_edges, _build_edge_state())
 
 
@@ -282,9 +317,11 @@ func _build_edge_state() -> Dictionary:
 		var from_id := String(edge_data.get("from", ""))
 		var to_id := String(edge_data.get("to", ""))
 		var edge_key := "%s->%s" % [from_id, to_id]
-		if purchased_skills.has(from_id) and purchased_skills.has(to_id):
+		if not _is_skill_revealed(from_id) or not _is_skill_revealed(to_id):
+			edge_state[edge_key] = "hidden"
+		elif _get_skill_rank(from_id) > 0 and _get_skill_rank(to_id) > 0:
 			edge_state[edge_key] = "purchased"
-		elif purchased_skills.has(from_id) and _is_skill_available(to_id):
+		elif _get_skill_rank(from_id) > 0 and _is_skill_available(to_id):
 			edge_state[edge_key] = "available"
 		else:
 			edge_state[edge_key] = "locked"
@@ -343,7 +380,7 @@ func _create_tooltip() -> void:
 
 
 func _refresh_tooltip() -> void:
-	if selected_skill_id.is_empty() or not skill_defs.has(selected_skill_id):
+	if selected_skill_id.is_empty() or not skill_defs.has(selected_skill_id) or not _is_skill_revealed(selected_skill_id):
 		tooltip_panel.visible = false
 		return
 
@@ -369,6 +406,8 @@ func _layout_tooltip() -> void:
 		return
 
 	var button: Control = buttons[selected_skill_id]
+	if not button.visible:
+		return
 	var button_position := graph_content.position + button.position * graph_zoom
 	var button_size := button.size * graph_zoom
 	var desired := button_position + Vector2(button_size.x + 28.0, button_size.y * 0.25)
@@ -490,6 +529,8 @@ func _is_mouse_over_skill_node() -> bool:
 	var mouse_position := tree_area.get_local_mouse_position()
 	for skill_id in buttons.keys():
 		var button: Control = buttons[skill_id]
+		if not button.visible:
+			continue
 		var button_rect := Rect2(
 			graph_content.position + button.position * graph_zoom,
 			button.size * graph_zoom

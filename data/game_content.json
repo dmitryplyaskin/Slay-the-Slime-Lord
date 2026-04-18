@@ -1,194 +1,229 @@
 {
   "balance": {
-    "player_stats": {
-      "pulse_damage": 1.0,
-      "attack_interval": 1.15,
-      "round_duration": 8.0,
-      "slime_count": 10.0,
-      "slime_hp": 2.0,
-      "slime_speed": 70.0,
-      "crystal_value": 1.0,
-      "attack_radius": 20.0
-    },
-    "round_scaling": {
-      "bonus_slimes_per_round": 1,
-      "bonus_slime_round_cap": 5,
-      "slime_hp_per_round": 0.0,
-      "slime_speed_per_round": 2.0
-    },
-    "combat_limits": {
-      "min_attack_interval": 0.18
-    }
+	"player_stats": {
+	  "pulse_damage": 1.0,
+	  "attack_interval": 1.15,
+	  "round_duration": 8.0,
+	  "slime_count": 10.0,
+	  "slime_hp": 2.0,
+	  "slime_speed": 70.0,
+	  "crystal_value": 1.0,
+	  "attack_radius": 20.0
+	},
+	"round_scaling": {
+	  "bonus_slimes_per_round": 1,
+	  "bonus_slime_round_cap": 5,
+	  "slime_hp_per_round": 0.0,
+	  "slime_speed_per_round": 2.0
+	},
+	"combat_limits": {
+	  "min_attack_interval": 0.18
+	}
   },
   "slimes": [
-    {
-      "id": "moss_slime",
-      "name_key": "slime.moss.name",
-      "color": "#78db7a"
-    }
+	{
+	  "id": "moss_slime",
+	  "name_key": "slime.moss.name",
+	  "color": "#78db7a"
+	}
   ],
   "skills": [
-    {
-      "id": "acid_touch",
-      "title_key": "skill.acid_touch.title",
-      "description_key": "skill.acid_touch.description",
-      "icon_text": "DMG",
-      "graph_position": [0, 1],
-      "cost": 2,
-      "requires": [],
-      "modifiers": [
-        {
-          "stat": "pulse_damage",
-          "mode": "add",
-          "value": 1.0
-        }
-      ]
-    },
-    {
-      "id": "focus_lens",
-      "title_key": "skill.focus_lens.title",
-      "description_key": "skill.focus_lens.description",
-      "icon_text": "RAD",
-      "graph_position": [1, 0],
-      "cost": 1,
-      "requires": [
+	{
+	  "id": "acid_touch",
+	  "title_key": "skill.acid_touch.title",
+	  "description_key": "skill.acid_touch.description",
+	  "icon_text": "DMG",
+	  "graph_position": [0, 0],
+	  "cost": 2,
+	  "cost_per_rank": 1,
+	  "max_rank": 5,
+	  "requires": [],
+	  "modifiers": [
+		{
+		  "stat": "pulse_damage",
+		  "mode": "add",
+		  "value": 1.0
+		}
+	  ]
+	},
+	{
+	  "id": "focus_lens",
+	  "title_key": "skill.focus_lens.title",
+	  "description_key": "skill.focus_lens.description",
+	  "icon_text": "RAD",
+	  "graph_position": [1, 0],
+	  "cost": 1,
+	  "cost_per_rank": 1,
+	  "max_rank": 5,
+	  "requires": [
         "acid_touch"
-      ],
-      "modifiers": [
-        {
-          "stat": "attack_radius",
-          "mode": "add",
-          "value": 6.0
-        }
-      ]
-    },
-    {
-      "id": "long_sweep",
-      "title_key": "skill.long_sweep.title",
-      "description_key": "skill.long_sweep.description",
-      "icon_text": "SPD",
-      "graph_position": [1, 2],
-      "cost": 2,
-      "requires": [
+	  ],
+	  "modifiers": [
+		{
+		  "stat": "attack_radius",
+		  "mode": "add",
+		  "value": 5.0
+		}
+	  ]
+	},
+	{
+	  "id": "long_sweep",
+	  "title_key": "skill.long_sweep.title",
+	  "description_key": "skill.long_sweep.description",
+	  "icon_text": "SPD",
+	  "graph_position": [0, 1],
+	  "cost": 2,
+	  "cost_per_rank": 1,
+	  "max_rank": 5,
+	  "requires": [
         "acid_touch"
-      ],
-      "modifiers": [
-        {
-          "stat": "attack_interval",
-          "mode": "add",
-          "value": -0.1
-        }
-      ]
-    },
-    {
-      "id": "greedy_gloves",
-      "title_key": "skill.greedy_gloves.title",
-      "description_key": "skill.greedy_gloves.description",
-      "icon_text": "GEM",
-      "graph_position": [0, 4],
-      "cost": 3,
-      "requires": [],
-      "modifiers": [
-        {
-          "stat": "crystal_value",
-          "mode": "add",
-          "value": 1.0
-        }
-      ]
-    },
-    {
-      "id": "rich_vein",
-      "title_key": "skill.rich_vein.title",
-      "description_key": "skill.rich_vein.description",
-      "icon_text": "G+",
-      "graph_position": [1, 4],
-      "cost": 5,
-      "requires": [
+	  ],
+	  "modifiers": [
+		{
+		  "stat": "attack_interval",
+		  "mode": "add",
+		  "value": -0.08
+		}
+	  ]
+	},
+	{
+	  "id": "extended_hunt",
+	  "title_key": "skill.extended_hunt.title",
+	  "description_key": "skill.extended_hunt.description",
+	  "icon_text": "TIM",
+	  "graph_position": [-1, 0],
+	  "cost": 1,
+	  "cost_per_rank": 1,
+	  "max_rank": 4,
+	  "requires": [
+        "acid_touch"
+	  ],
+	  "modifiers": [
+		{
+		  "stat": "round_duration",
+		  "mode": "add",
+		  "value": 1.0
+		}
+	  ]
+	},
+	{
+	  "id": "greedy_gloves",
+	  "title_key": "skill.greedy_gloves.title",
+	  "description_key": "skill.greedy_gloves.description",
+	  "icon_text": "GEM",
+	  "graph_position": [0, -1],
+	  "cost": 2,
+	  "cost_per_rank": 2,
+	  "max_rank": 3,
+	  "requires": [
+        "acid_touch"
+	  ],
+	  "modifiers": [
+		{
+		  "stat": "crystal_value",
+		  "mode": "add",
+		  "value": 1.0
+		}
+	  ]
+	},
+	{
+	  "id": "rich_vein",
+	  "title_key": "skill.rich_vein.title",
+	  "description_key": "skill.rich_vein.description",
+	  "icon_text": "G+",
+	  "graph_position": [0, -2],
+	  "cost": 4,
+	  "cost_per_rank": 2,
+	  "max_rank": 3,
+	  "requires": [
         "greedy_gloves"
-      ],
-      "modifiers": [
-        {
-          "stat": "crystal_value",
-          "mode": "add",
-          "value": 1.0
-        }
-      ]
-    },
-    {
-      "id": "swarm_call",
-      "title_key": "skill.swarm_call.title",
-      "description_key": "skill.swarm_call.description",
-      "icon_text": "SWM",
-      "graph_position": [2, 3],
-      "cost": 3,
-      "requires": [
-        "rich_vein"
-      ],
-      "modifiers": [
-        {
-          "stat": "slime_count",
-          "mode": "add",
-          "value": 2.0
-        }
-      ]
-    },
-    {
-      "id": "overcharge",
-      "title_key": "skill.overcharge.title",
-      "description_key": "skill.overcharge.description",
-      "icon_text": "BST",
-      "graph_position": [2, 1],
-      "cost": 5,
-      "requires": [
-        "focus_lens",
+	  ],
+	  "modifiers": [
+		{
+		  "stat": "crystal_value",
+		  "mode": "add",
+		  "value": 1.0
+		}
+	  ]
+	},
+	{
+	  "id": "overcharge",
+	  "title_key": "skill.overcharge.title",
+	  "description_key": "skill.overcharge.description",
+	  "icon_text": "BST",
+	  "graph_position": [2, 0],
+	  "cost": 4,
+	  "cost_per_rank": 2,
+	  "max_rank": 3,
+	  "requires": [
+        "focus_lens"
+	  ],
+	  "modifiers": [
+		{
+		  "stat": "pulse_damage",
+		  "mode": "add",
+		  "value": 1.0
+		},
+		{
+		  "stat": "attack_interval",
+		  "mode": "add",
+		  "value": -0.04
+		}
+	  ]
+	},
+	{
+	  "id": "swarm_call",
+	  "title_key": "skill.swarm_call.title",
+	  "description_key": "skill.swarm_call.description",
+	  "icon_text": "SWM",
+	  "graph_position": [0, 2],
+	  "cost": 3,
+	  "cost_per_rank": 2,
+	  "max_rank": 4,
+	  "requires": [
         "long_sweep"
-      ],
-      "modifiers": [
-        {
-          "stat": "pulse_damage",
-          "mode": "add",
-          "value": 1.0
-        },
-        {
-          "stat": "attack_interval",
-          "mode": "add",
-          "value": -0.08
-        }
-      ]
-    },
-    {
-      "id": "boss_hunter",
-      "title_key": "skill.boss_hunter.title",
-      "description_key": "skill.boss_hunter.description",
-      "icon_text": "BOS",
-      "graph_position": [3, 2],
-      "cost": 6,
-      "requires": [
-        "overcharge",
-        "swarm_call"
-      ],
-      "modifiers": [
-        {
-          "stat": "pulse_damage",
-          "mode": "add",
-          "value": 2.0
-        },
-        {
-          "stat": "round_duration",
-          "mode": "add",
-          "value": 2.0
-        }
-      ]
-    }
+	  ],
+	  "modifiers": [
+		{
+		  "stat": "slime_count",
+		  "mode": "add",
+		  "value": 2.0
+		}
+	  ]
+	},
+	{
+	  "id": "boss_hunter",
+	  "title_key": "skill.boss_hunter.title",
+	  "description_key": "skill.boss_hunter.description",
+	  "icon_text": "BOS",
+	  "graph_position": [-2, 0],
+	  "cost": 6,
+	  "max_rank": 1,
+	  "requires": [
+        "extended_hunt"
+	  ],
+	  "modifiers": [
+		{
+		  "stat": "pulse_damage",
+		  "mode": "add",
+		  "value": 2.0
+		},
+		{
+		  "stat": "round_duration",
+		  "mode": "add",
+		  "value": 2.0
+		}
+	  ]
+	}
   ],
   "languages": [
-    {
-      "id": "ru",
-      "label_key": "language.ru"
-    },
-    {
-      "id": "en",
-      "label_key": "language.en"
-    }
+	{
+	  "id": "ru",
+	  "label_key": "language.ru"
+	},
+	{
+	  "id": "en",
+	  "label_key": "language.en"
+	}
   ]
 }
