@@ -2,19 +2,19 @@
   "balance": {
     "player_stats": {
       "pulse_damage": 1.0,
-      "attack_interval": 0.8,
-      "round_duration": 10.0,
+      "attack_interval": 1.15,
+      "round_duration": 8.0,
       "slime_count": 10.0,
       "slime_hp": 2.0,
-      "slime_speed": 65.0,
+      "slime_speed": 70.0,
       "crystal_value": 1.0,
-      "attack_radius": 23.0
+      "attack_radius": 20.0
     },
     "round_scaling": {
-      "bonus_slimes_per_round": 0,
-      "bonus_slime_round_cap": 0,
+      "bonus_slimes_per_round": 1,
+      "bonus_slime_round_cap": 5,
       "slime_hp_per_round": 0.0,
-      "slime_speed_per_round": 0.0
+      "slime_speed_per_round": 2.0
     },
     "combat_limits": {
       "min_attack_interval": 0.18
@@ -34,13 +34,13 @@
       "description_key": "skill.acid_touch.description",
       "icon_text": "DMG",
       "graph_position": [0, 1],
-      "cost": 3,
+      "cost": 2,
       "requires": [],
       "modifiers": [
         {
           "stat": "pulse_damage",
           "mode": "add",
-          "value": 12.0
+          "value": 1.0
         }
       ]
     },
@@ -50,7 +50,7 @@
       "description_key": "skill.focus_lens.description",
       "icon_text": "RAD",
       "graph_position": [1, 0],
-      "cost": 3,
+      "cost": 1,
       "requires": [
         "acid_touch"
       ],
@@ -58,7 +58,7 @@
         {
           "stat": "attack_radius",
           "mode": "add",
-          "value": 18.0
+          "value": 6.0
         }
       ]
     },
@@ -68,7 +68,7 @@
       "description_key": "skill.long_sweep.description",
       "icon_text": "SPD",
       "graph_position": [1, 2],
-      "cost": 4,
+      "cost": 2,
       "requires": [
         "acid_touch"
       ],
@@ -76,7 +76,7 @@
         {
           "stat": "attack_interval",
           "mode": "add",
-          "value": -0.12
+          "value": -0.1
         }
       ]
     },
@@ -102,7 +102,7 @@
       "description_key": "skill.rich_vein.description",
       "icon_text": "G+",
       "graph_position": [1, 4],
-      "cost": 4,
+      "cost": 5,
       "requires": [
         "greedy_gloves"
       ],
@@ -120,7 +120,7 @@
       "description_key": "skill.swarm_call.description",
       "icon_text": "SWM",
       "graph_position": [2, 3],
-      "cost": 4,
+      "cost": 3,
       "requires": [
         "rich_vein"
       ],
@@ -147,7 +147,7 @@
         {
           "stat": "pulse_damage",
           "mode": "add",
-          "value": 10.0
+          "value": 1.0
         },
         {
           "stat": "attack_interval",
@@ -171,7 +171,7 @@
         {
           "stat": "pulse_damage",
           "mode": "add",
-          "value": 16.0
+          "value": 2.0
         },
         {
           "stat": "round_duration",
