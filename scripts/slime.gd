@@ -4,34 +4,49 @@ class_name Slime
 signal defeated(world_position: Vector2, slime_color: Color)
 
 const EDGE_PADDING := 34.0
+const MIN_IDLE_TIME := 0.45
+const MAX_IDLE_TIME := 1.35
+const MIN_MOVE_TIME := 0.35
+const MAX_MOVE_TIME := 0.85
+const INITIAL_MOVE_CHANCE := 0.35
+const MOVE_CHANCE_AFTER_IDLE := 0.65
 
 var slime_color: Color = Color(0.46, 0.86, 0.47, 1.0)
 var max_health := 20.0
 var health := 20.0
+var move_speed := 80.0
 var move_velocity := Vector2.ZERO
 var arena_rect := Rect2(Vector2.ZERO, Vector2(1280.0, 720.0))
 var targeted := false
 var slime_name_key := "slime.moss.name"
 var slime_index := 1
+var behavior_timer := 0.0
+var behavior_rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
+	behavior_rng.randomize()
+	_pick_initial_behavior()
 	queue_redraw()
 
 
-func setup(arena: Rect2, spawn_position: Vector2, initial_velocity: Vector2, color: Color, hp: float, name_key: String, display_index: int) -> void:
+func setup(arena: Rect2, spawn_position: Vector2, speed: float, color: Color, hp: float, name_key: String, display_index: int) -> void:
 	arena_rect = arena
 	global_position = spawn_position
-	move_velocity = initial_velocity
+	move_speed = speed
+	move_velocity = Vector2.ZERO
 	slime_color = color
 	max_health = hp
 	health = hp
 	slime_name_key = name_key
 	slime_index = display_index
+	if is_node_ready():
+		_pick_initial_behavior()
 	queue_redraw()
 
 
 func _process(delta: float) -> void:
+	_update_behavior(delta)
 	position += move_velocity * delta
 	_keep_inside_arena()
 	queue_redraw()
@@ -86,6 +101,42 @@ func _keep_inside_arena() -> void:
 	elif position.y > max_y:
 		position.y = max_y
 		move_velocity.y = -absf(move_velocity.y)
+
+
+func _update_behavior(delta: float) -> void:
+	behavior_timer -= delta
+	if behavior_timer > 0.0:
+		return
+
+	if move_velocity == Vector2.ZERO:
+		if behavior_rng.randf() < MOVE_CHANCE_AFTER_IDLE:
+			_start_moving_randomly()
+		else:
+			_start_idling()
+	else:
+		_start_idling()
+
+
+func _pick_initial_behavior() -> void:
+	if move_speed <= 0.0 or behavior_rng.randf() >= INITIAL_MOVE_CHANCE:
+		_start_idling()
+	else:
+		_start_moving_randomly()
+
+
+func _start_idling() -> void:
+	move_velocity = Vector2.ZERO
+	behavior_timer = behavior_rng.randf_range(MIN_IDLE_TIME, MAX_IDLE_TIME)
+
+
+func _start_moving_randomly() -> void:
+	if move_speed <= 0.0:
+		_start_idling()
+		return
+
+	var direction := Vector2.from_angle(behavior_rng.randf_range(0.0, TAU))
+	move_velocity = direction * move_speed
+	behavior_timer = behavior_rng.randf_range(MIN_MOVE_TIME, MAX_MOVE_TIME)
 
 
 func _draw() -> void:

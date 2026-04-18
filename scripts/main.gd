@@ -135,11 +135,10 @@ func _spawn_slimes() -> void:
 			rng.randf_range(arena_rect.position.x + 40.0, arena_rect.end.x - 40.0),
 			rng.randf_range(arena_rect.position.y + 40.0, arena_rect.end.y - 40.0)
 		)
-		var direction := Vector2.from_angle(rng.randf_range(0.0, TAU))
 		slime.setup(
 			arena_rect,
 			spawn_position,
-			direction * slime_speed,
+			slime_speed,
 			Color.html(String(slime_data["color"])),
 			slime_hp,
 			String(slime_data["name_key"]),
