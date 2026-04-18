@@ -42,8 +42,17 @@ Use that after gameplay/script changes to catch parse and startup errors quickly
 - `project.godot`
   Starts the project in `res://scenes/main.tscn` and registers autoload services.
 
-- `data/game_content.json`
-  Main content source. Base player stats, round scaling, slime definitions, skill definitions, and supported languages live here.
+- `data/balance.json`
+  Base player stats, round scaling, and combat limits.
+
+- `data/skills.json`
+  Skill tree definitions, ranks, costs, requirements, graph positions, and modifiers.
+
+- `data/slimes.json`
+  Slime content definitions.
+
+- `data/languages.json`
+  Supported manual localization languages.
 
 - `data/localization/ru.json`
 - `data/localization/en.json`
@@ -99,7 +108,7 @@ Treat these as intentional unless the user asks to change them:
 - `ContentDB` is the source of truth for static game content.
 - `Localization` is the source of truth for player-facing strings.
 - Scene scripts should coordinate systems, not store large balance dictionaries.
-- Add new modifiers as data in `game_content.json` first, then teach `RunState` how to resolve them if a new mode is needed.
+- Add new skill modifiers as data in `data/skills.json` first, then teach `RunState` how to resolve them if a new mode is needed.
 - Avoid pushing more gameplay state back into `main.gd` unless it is purely scene-specific.
 
 
@@ -109,7 +118,9 @@ Treat these as intentional unless the user asks to change them:
 - Prefer simple scene/script changes over adding deep abstractions.
 - If a mechanic changes, also update localization strings so the prototype stays readable.
 - If you change combat stats or content, check:
-  - `data/game_content.json`
+  - `data/balance.json`
+  - `data/skills.json`
+  - `data/slimes.json`
   - `data/localization/*.json`
   - any runtime logic in `scripts/core/run_state.gd`
 - If you add new gameplay nodes to the main scene, keep names stable and wire them explicitly in `@onready`.
@@ -123,13 +134,13 @@ Treat these as intentional unless the user asks to change them:
   - edit `attack_radius`
   - edit `attack_interval`
   - edit `pulse_damage`
-  - all are currently in `data/game_content.json`
+  - all are currently in `data/balance.json`
 
 - To change upgrade balance:
-  - edit `skills` in `data/game_content.json`
+  - edit `data/skills.json`
 
 - To add slime variants:
-  - edit `slimes` in `data/game_content.json`
+  - edit `data/slimes.json`
   - add localization names in both locale files
 
 - To change arena presentation:

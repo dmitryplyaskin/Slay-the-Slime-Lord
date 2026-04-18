@@ -1,8 +1,14 @@
 extends Node
 
-const CONTENT_PATH := "res://data/game_content.json"
+const BALANCE_PATH := "res://data/balance.json"
+const SKILLS_PATH := "res://data/skills.json"
+const SLIMES_PATH := "res://data/slimes.json"
+const LANGUAGES_PATH := "res://data/languages.json"
 
-var raw_data: Dictionary = {}
+var balance_data: Dictionary = {}
+var skills_data: Array[Dictionary] = []
+var slimes_data: Array[Dictionary] = []
+var languages_data: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -10,42 +16,45 @@ func _ready() -> void:
 
 
 func reload() -> void:
-	raw_data = _load_json(CONTENT_PATH)
+	balance_data = _load_json(BALANCE_PATH)
+	skills_data = _load_dictionary_array(SKILLS_PATH, "skills")
+	slimes_data = _load_dictionary_array(SLIMES_PATH, "slimes")
+	languages_data = _load_dictionary_array(LANGUAGES_PATH, "languages")
 
 
 func get_balance() -> Dictionary:
-	return raw_data.get("balance", {}).duplicate(true)
+	return balance_data.duplicate(true)
 
 
 func get_player_base_stats() -> Dictionary:
-	return raw_data.get("balance", {}).get("player_stats", {}).duplicate(true)
+	return balance_data.get("player_stats", {}).duplicate(true)
 
 
 func get_round_scaling() -> Dictionary:
-	return raw_data.get("balance", {}).get("round_scaling", {}).duplicate(true)
+	return balance_data.get("round_scaling", {}).duplicate(true)
 
 
 func get_combat_limits() -> Dictionary:
-	return raw_data.get("balance", {}).get("combat_limits", {}).duplicate(true)
+	return balance_data.get("combat_limits", {}).duplicate(true)
 
 
 func get_skills() -> Dictionary:
 	var result: Dictionary = {}
-	for skill_data in raw_data.get("skills", []):
+	for skill_data in skills_data:
 		result[String(skill_data.get("id", ""))] = (skill_data as Dictionary).duplicate(true)
 	return result
 
 
 func get_slimes() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for slime_data in raw_data.get("slimes", []):
+	for slime_data in slimes_data:
 		result.append((slime_data as Dictionary).duplicate(true))
 	return result
 
 
 func get_languages() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for language_data in raw_data.get("languages", []):
+	for language_data in languages_data:
 		result.append((language_data as Dictionary).duplicate(true))
 	return result
 
@@ -66,3 +75,12 @@ func _load_json(path: String) -> Dictionary:
 	if data is Dictionary:
 		return (data as Dictionary).duplicate(true)
 	return {}
+
+
+func _load_dictionary_array(path: String, key: String) -> Array[Dictionary]:
+	var file_data := _load_json(path)
+	var result: Array[Dictionary] = []
+	for item in file_data.get(key, []):
+		if item is Dictionary:
+			result.append((item as Dictionary).duplicate(true))
+	return result

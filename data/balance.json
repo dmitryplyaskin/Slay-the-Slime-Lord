@@ -1,0 +1,21 @@
+{
+  "player_stats": {
+    "pulse_damage": 1.0,
+    "attack_interval": 1.15,
+    "round_duration": 8.0,
+    "slime_count": 10.0,
+    "slime_hp": 2.0,
+    "slime_speed": 70.0,
+    "crystal_value": 1.0,
+    "attack_radius": 20.0
+  },
+  "round_scaling": {
+    "bonus_slimes_per_round": 1,
+    "bonus_slime_round_cap": 5,
+    "slime_hp_per_round": 0.0,
+    "slime_speed_per_round": 2.0
+  },
+  "combat_limits": {
+    "min_attack_interval": 0.18
+  }
+}

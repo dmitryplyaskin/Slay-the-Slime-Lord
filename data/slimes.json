@@ -1,0 +1,9 @@
+{
+  "slimes": [
+    {
+      "id": "moss_slime",
+      "name_key": "slime.moss.name",
+      "color": "#78db7a"
+    }
+  ]
+}

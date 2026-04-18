@@ -1,0 +1,12 @@
+{
+  "languages": [
+	{
+	  "id": "ru",
+	  "label_key": "language.ru"
+	},
+	{
+	  "id": "en",
+	  "label_key": "language.en"
+	}
+  ]
+}
