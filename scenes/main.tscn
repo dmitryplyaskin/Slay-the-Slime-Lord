@@ -202,7 +202,7 @@ mouse_filter = 2
 [node name="RoundLabel" type="Label" parent="CanvasLayer/HUD/TopBar/Row/RoundBadge"]
 layout_mode = 2
 custom_minimum_size = Vector2(88, 0)
-text = "Раунд 1"
+text = "Охота"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.9, 0.96, 0.87, 1)
 theme_override_font_sizes/font_size = 16
@@ -329,7 +329,7 @@ theme_override_constants/separation = 12
 
 [node name="ResultTitleLabel" type="Label" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox"]
 layout_mode = 2
-text = "Раунд завершен"
+text = "Охота завершена"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.96, 0.98, 0.91, 1)
 theme_override_font_sizes/font_size = 30
@@ -344,17 +344,85 @@ theme_override_font_sizes/font_size = 17
 
 [node name="ResultStatsLabel" type="Label" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 86)
+custom_minimum_size = Vector2(0, 34)
 autowrap_mode = 3
-text = "Добыча"
+text = "Кристаллы"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.95, 0.95, 0.86, 1)
 theme_override_font_sizes/font_size = 19
 
-[node name="ContinueButton" type="Button" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox"]
+[node name="CrystalTable" type="GridContainer" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(220, 50)
 size_flags_horizontal = 4
+theme_override_constants/h_separation = 34
+theme_override_constants/v_separation = 10
+columns = 3
+
+[node name="CrystalTypeHeaderLabel" type="Label" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 0)
+text = "Тип"
+theme_override_colors/font_color = Color(0.64, 0.77, 0.66, 1)
+theme_override_font_sizes/font_size = 16
+
+[node name="CrystalEarnedHeaderLabel" type="Label" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 0)
+text = "Получено"
+horizontal_alignment = 2
+theme_override_colors/font_color = Color(0.64, 0.77, 0.66, 1)
+theme_override_font_sizes/font_size = 16
+
+[node name="CrystalTotalHeaderLabel" type="Label" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 0)
+text = "Всего"
+horizontal_alignment = 2
+theme_override_colors/font_color = Color(0.64, 0.77, 0.66, 1)
+theme_override_font_sizes/font_size = 16
+
+[node name="GreenCrystalNameLabel" type="Label" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 0)
+text = "Зеленые кристаллы"
+theme_override_colors/font_color = Color(0.65, 1, 0.67, 1)
+theme_override_font_sizes/font_size = 19
+
+[node name="GreenCrystalEarnedLabel" type="Label" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 0)
+text = "0"
+horizontal_alignment = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.86, 1)
+theme_override_font_sizes/font_size = 19
+
+[node name="GreenCrystalTotalLabel" type="Label" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 0)
+text = "0"
+horizontal_alignment = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.86, 1)
+theme_override_font_sizes/font_size = 19
+
+[node name="ButtonsRow" type="HBoxContainer" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="RestartButton" type="Button" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/ButtonsRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(200, 50)
+text = "Начать снова"
+theme_override_colors/font_color = Color(0.08, 0.065, 0.035, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+mouse_filter = 0
+
+[node name="ContinueButton" type="Button" parent="CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/ButtonsRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(200, 50)
 text = "К навыкам"
 theme_override_colors/font_color = Color(0.08, 0.065, 0.035, 1)
 theme_override_font_sizes/font_size = 18
@@ -455,7 +523,7 @@ alignment = 2
 [node name="StartButton" type="Button" parent="CanvasLayer/SkillTree/Backdrop/Panel/Margin/VBox/Footer"]
 layout_mode = 2
 custom_minimum_size = Vector2(220, 50)
-text = "Начать раунд"
+text = "Вернуться на поле"
 theme_override_colors/font_color = Color(0.08, 0.065, 0.035, 1)
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_button")

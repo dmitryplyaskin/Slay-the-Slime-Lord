@@ -53,7 +53,14 @@ var active_hint_params: Dictionary = {}
 @onready var result_title_label: Label = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/ResultTitleLabel
 @onready var result_reason_label: Label = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/ResultReasonLabel
 @onready var result_stats_label: Label = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/ResultStatsLabel
-@onready var result_continue_button: Button = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/ContinueButton
+@onready var result_crystal_type_header_label: Label = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable/CrystalTypeHeaderLabel
+@onready var result_crystal_earned_header_label: Label = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable/CrystalEarnedHeaderLabel
+@onready var result_crystal_total_header_label: Label = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable/CrystalTotalHeaderLabel
+@onready var result_green_crystal_name_label: Label = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable/GreenCrystalNameLabel
+@onready var result_green_crystal_earned_label: Label = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable/GreenCrystalEarnedLabel
+@onready var result_green_crystal_total_label: Label = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/CrystalTable/GreenCrystalTotalLabel
+@onready var result_restart_button: Button = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/ButtonsRow/RestartButton
+@onready var result_continue_button: Button = $CanvasLayer/ResultOverlay/Backdrop/Panel/VBox/ButtonsRow/ContinueButton
 @onready var skill_tree: SkillTreePanel = $CanvasLayer/SkillTree
 
 
@@ -71,6 +78,7 @@ func _ready() -> void:
 	skill_tree.skill_purchased.connect(_on_skill_purchased)
 	skill_tree.next_round_requested.connect(_on_next_round_requested)
 	Localization.locale_changed.connect(_on_locale_changed)
+	result_restart_button.pressed.connect(_on_result_restart_requested)
 	result_continue_button.pressed.connect(_on_result_continue_requested)
 	get_viewport().size_changed.connect(_on_viewport_size_changed)
 	_setup_language_selector()
@@ -280,13 +288,22 @@ func _refresh_result_screen() -> void:
 	var earned_this_round: int = int(run_state.crystal_bank) - round_start_crystals
 	result_title_label.text = Localization.tr_key("result.title", {"round": run_state.round_number})
 	result_reason_label.text = Localization.tr_key(round_end_reason_key)
-	result_stats_label.text = Localization.tr_key("result.stats", {
-		"crystals": earned_this_round,
-		"defeated": round_defeated_count,
-		"total": round_spawn_count,
-		"bank": run_state.crystal_bank,
-	})
+	result_stats_label.text = Localization.tr_key("result.crystals.title")
+	result_crystal_type_header_label.text = Localization.tr_key("result.crystals.type")
+	result_crystal_earned_header_label.text = Localization.tr_key("result.crystals.earned")
+	result_crystal_total_header_label.text = Localization.tr_key("result.crystals.total")
+	result_green_crystal_name_label.text = Localization.tr_key("result.crystals.green")
+	result_green_crystal_earned_label.text = str(earned_this_round)
+	result_green_crystal_total_label.text = str(run_state.crystal_bank)
+	result_restart_button.text = Localization.tr_key("result.restart")
 	result_continue_button.text = Localization.tr_key("result.continue")
+
+
+func _on_result_restart_requested() -> void:
+	if state != GameState.RESULT:
+		return
+
+	_start_round()
 
 
 func _on_result_continue_requested() -> void:
@@ -370,8 +387,8 @@ func _layout_hud(viewport_size: Vector2) -> void:
 
 
 func _layout_result_panel(viewport_size: Vector2) -> void:
-	var panel_width := clampf(viewport_size.x * 0.44, 360.0, 560.0)
-	var panel_height := clampf(viewport_size.y * 0.46, 300.0, 390.0)
+	var panel_width := clampf(viewport_size.x * 0.58, 500.0, 740.0)
+	var panel_height := clampf(viewport_size.y * 0.58, 380.0, 520.0)
 	result_panel.offset_left = -panel_width * 0.5
 	result_panel.offset_right = panel_width * 0.5
 	result_panel.offset_top = -panel_height * 0.5
