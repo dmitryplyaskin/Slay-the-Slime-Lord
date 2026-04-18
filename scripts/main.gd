@@ -152,8 +152,11 @@ func _update_targeted_slimes() -> void:
 	var targeted_count := 0
 	var mouse_position := get_global_mouse_position()
 	var attack_radius := float(run_state.get_effective_stats()["attack_radius"])
-	for slime in slimes_layer.get_children():
-		var is_inside: bool = slime.global_position.distance_to(mouse_position) <= attack_radius
+	for child in slimes_layer.get_children():
+		var slime := child as Slime
+		if slime == null:
+			continue
+		var is_inside := _is_slime_in_attack_range(slime, mouse_position, attack_radius)
 		slime.set_targeted(is_inside)
 		if is_inside:
 			targeted_count += 1
@@ -184,9 +187,17 @@ func _fire_pulse() -> void:
 	var effective_stats: Dictionary = run_state.get_effective_stats()
 	var attack_radius := float(effective_stats["attack_radius"])
 	var pulse_damage := float(effective_stats["pulse_damage"])
-	for slime in slimes_layer.get_children():
-		if slime.global_position.distance_to(mouse_position) <= attack_radius:
+	for child in slimes_layer.get_children():
+		var slime := child as Slime
+		if slime == null:
+			continue
+		if _is_slime_in_attack_range(slime, mouse_position, attack_radius):
 			slime.take_damage(pulse_damage)
+
+
+func _is_slime_in_attack_range(slime: Slime, attack_origin: Vector2, attack_radius: float) -> bool:
+	var overlap_radius := attack_radius + slime.get_hit_radius()
+	return slime.global_position.distance_squared_to(attack_origin) <= overlap_radius * overlap_radius
 
 
 func _finish_round(reason: String) -> void:

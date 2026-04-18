@@ -4,6 +4,7 @@ class_name Slime
 signal defeated(world_position: Vector2, slime_color: Color)
 
 const EDGE_PADDING := 34.0
+const HIT_RADIUS := 30.0
 const MIN_IDLE_TIME := 0.45
 const MAX_IDLE_TIME := 1.35
 const MIN_MOVE_TIME := 0.35
@@ -80,6 +81,10 @@ func get_health_ratio() -> float:
 
 func get_display_name() -> String:
 	return "%s %d" % [Localization.tr_key(slime_name_key), slime_index]
+
+
+func get_hit_radius() -> float:
+	return HIT_RADIUS
 
 
 func _keep_inside_arena() -> void:
@@ -164,5 +169,3 @@ func _draw() -> void:
 	var bar_position := Vector2(-bar_width * 0.5, -42.0)
 	draw_rect(Rect2(bar_position, Vector2(bar_width, 7.0)), Color(0.06, 0.07, 0.1, 0.75), true)
 	draw_rect(Rect2(bar_position + Vector2.ONE, Vector2((bar_width - 2.0) * health_ratio, 5.0)), Color(0.56, 0.96, 0.67, 0.95), true)
-	if targeted:
-		draw_arc(Vector2.ZERO, 36.0, 0.0, TAU, 40, Color(1.0, 0.96, 0.68, 0.95), 2.0, true)
